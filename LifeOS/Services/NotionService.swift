@@ -13,10 +13,12 @@ class NotionService {
     // MARK: - Database IDs
     // These are the databases created in your Notion AI WORKSPACE
     struct DatabaseIDs {
-        static let morningRoutineTracker = "c141976a-169a-4803-bf24-df02fb7b66b3"
-        static let dailyHealthTracker    = "5b0d0827-1365-44ac-93d0-0c60e9694e38"
-        static let recipesAndShakes      = "a50b83e8-944c-405e-98e9-6719416ba66b"
-        static let sleepTracker          = "8842f9a0-aa03-453e-a5b4-1d8451ce5544"
+        // Notion database PAGE IDs (not collection/data-source IDs)
+        // These match the actual database pages under AI WORKSPACE
+        static let morningRoutineTracker = "e8320b3b-c3d0-4221-8de9-01c8ecffab57"
+        static let dailyHealthTracker    = "871a178c-db27-4d2f-9ac9-ab87fc368da7"
+        static let recipesAndShakes      = "4aa371f3-86a6-48f7-bd8e-49b379d4946a"
+        static let sleepTracker          = "a846b573-e33d-4f73-98a7-114afee8b7e1"
     }
 
     // MARK: - Request Builder
