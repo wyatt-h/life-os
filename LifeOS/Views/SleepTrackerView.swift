@@ -5,8 +5,10 @@ import SwiftUI
 class SleepTrackerViewModel: ObservableObject {
     @Published var targetWakeTime: String = "8:15 AM"
     @Published var targetBedtime: String = "1:15 AM"
-    @Published var actualWakeTime: String = ""
-    @Published var actualBedtime: String = ""
+    @Published var actualWakeTime: Date = Calendar.current.date(bySettingHour: 7, minute: 0, second: 0, of: Date()) ?? Date()
+    @Published var actualBedtime: Date = Calendar.current.date(bySettingHour: 23, minute: 30, second: 0, of: Date()) ?? Date()
+    @Published var actualWakeTimeSet: Bool = false   // true once user has picked a time
+    @Published var actualBedtimeSet: Bool = false
     @Published var phase: String = "Phase 1: Easing In"
     
     @Published var wokeUpOnTime: Bool = false
@@ -21,6 +23,13 @@ class SleepTrackerViewModel: ObservableObject {
     @Published var syncMessage: String = ""
     @Published var todayPageId: String? = nil
     
+    // MARK: - Helpers
+    func timeString(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.dateFormat = "h:mm a"
+        return f.string(from: date)
+    }
+
     // 30-Day Plan schedule
     private let schedule: [(days: ClosedRange<Int>, wake: String, bed: String, phase: String)] = [
         (1...3,   "8:15 AM", "1:15 AM", "Phase 1: Easing In"),
@@ -102,15 +111,22 @@ class SleepTrackerViewModel: ObservableObject {
                     inBedOnTime = checkbox("In Bed On Time")
                     noScreens = checkbox("No Screens Before Bed")
                     
-                    let aw = text("Actual Wake Time")
-                    let ab = text("Actual Bedtime")
                     let tw = text("Target Wake Time")
                     let tb = text("Target Bedtime")
-                    
-                    if !aw.isEmpty { actualWakeTime = aw }
-                    if !ab.isEmpty { actualBedtime = ab }
                     if !tw.isEmpty { targetWakeTime = tw }
                     if !tb.isEmpty { targetBedtime = tb }
+
+                    // Parse stored actual times back into Date
+                    let tf = DateFormatter()
+                    tf.dateFormat = "h:mm a"
+                    let aw = text("Actual Wake Time")
+                    let ab = text("Actual Bedtime")
+                    if !aw.isEmpty, let d = tf.date(from: aw) {
+                        actualWakeTime = d; actualWakeTimeSet = true
+                    }
+                    if !ab.isEmpty, let d = tf.date(from: ab) {
+                        actualBedtime = d; actualBedtimeSet = true
+                    }
                 }
             }
         } catch {
@@ -132,8 +148,8 @@ class SleepTrackerViewModel: ObservableObject {
             "No Screens Before Bed": ["checkbox": noScreens],
             "Target Wake Time": ["rich_text": [["text": ["content": targetWakeTime]]]],
             "Target Bedtime": ["rich_text": [["text": ["content": targetBedtime]]]],
-            "Actual Wake Time": ["rich_text": [["text": ["content": actualWakeTime]]]],
-            "Actual Bedtime": ["rich_text": [["text": ["content": actualBedtime]]]],
+            "Actual Wake Time": ["rich_text": [["text": ["content": actualWakeTimeSet ? timeString(actualWakeTime) : ""]]]],
+            "Actual Bedtime": ["rich_text": [["text": ["content": actualBedtimeSet ? timeString(actualBedtime) : ""]]]],
             "Phase": ["select": ["name": phase]]
         ]
         
@@ -303,49 +319,121 @@ struct SleepTrackerView: View {
                         .padding(.horizontal)
                         
                         // MARK: Log Actual Times
-                        VStack(alignment: .leading, spacing: 12) {
-                            Button(action: { showActualTimes.toggle() }) {
+                        VStack(alignment: .leading, spacing: 0) {
+
+                            // Full-width expand button
+                            Button {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                    showActualTimes.toggle()
+                                }
+                            } label: {
                                 HStack {
-                                    Text("Log Actual Times")
+                                    Label("Log Actual Times", systemImage: "clock.badge.checkmark.fill")
                                         .font(.headline)
                                         .foregroundColor(.white)
                                     Spacer()
                                     Image(systemName: showActualTimes ? "chevron.up" : "chevron.down")
                                         .foregroundColor(.white.opacity(0.6))
                                 }
+                                .padding(16)
+                                .frame(maxWidth: .infinity)
+                                .contentShape(Rectangle())
                             }
-                            
+                            .buttonStyle(.plain)
+
                             if showActualTimes {
-                                VStack(spacing: 12) {
-                                    HStack {
-                                        Text("Actual Wake:")
-                                            .foregroundColor(.white.opacity(0.7))
-                                        TextField("e.g. 7:45 AM", text: $viewModel.actualWakeTime)
-                                            .foregroundColor(.white)
-                                            .multilineTextAlignment(.trailing)
+                                VStack(spacing: 0) {
+                                    Divider().background(Color.white.opacity(0.15))
+
+                                    // Wake-up time picker
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        HStack {
+                                            Image(systemName: "sun.max.fill")
+                                                .foregroundColor(.yellow)
+                                            Text("Actual Wake-Up Time")
+                                                .font(.subheadline.bold())
+                                                .foregroundColor(.white)
+                                            Spacer()
+                                            if viewModel.actualWakeTimeSet {
+                                                Text(viewModel.timeString(viewModel.actualWakeTime))
+                                                    .font(.subheadline.bold())
+                                                    .foregroundColor(.yellow)
+                                            }
+                                        }
+                                        .padding(.horizontal, 16)
+                                        .padding(.top, 12)
+
+                                        DatePicker(
+                                            "",
+                                            selection: $viewModel.actualWakeTime,
+                                            displayedComponents: .hourAndMinute
+                                        )
+                                        .datePickerStyle(.wheel)
+                                        .labelsHidden()
+                                        .frame(maxWidth: .infinity)
+                                        .colorScheme(.dark)
+                                        .onChange(of: viewModel.actualWakeTime) { _ in
+                                            viewModel.actualWakeTimeSet = true
+                                        }
                                     }
-                                    Divider().background(Color.white.opacity(0.2))
-                                    HStack {
-                                        Text("Actual Bedtime:")
-                                            .foregroundColor(.white.opacity(0.7))
-                                        TextField("e.g. 12:30 AM", text: $viewModel.actualBedtime)
-                                            .foregroundColor(.white)
-                                            .multilineTextAlignment(.trailing)
+
+                                    Divider().background(Color.white.opacity(0.15)).padding(.horizontal, 16)
+
+                                    // Bedtime picker
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        HStack {
+                                            Image(systemName: "moon.zzz.fill")
+                                                .foregroundColor(.purple)
+                                            Text("Actual Bedtime")
+                                                .font(.subheadline.bold())
+                                                .foregroundColor(.white)
+                                            Spacer()
+                                            if viewModel.actualBedtimeSet {
+                                                Text(viewModel.timeString(viewModel.actualBedtime))
+                                                    .font(.subheadline.bold())
+                                                    .foregroundColor(.purple)
+                                            }
+                                        }
+                                        .padding(.horizontal, 16)
+                                        .padding(.top, 8)
+
+                                        DatePicker(
+                                            "",
+                                            selection: $viewModel.actualBedtime,
+                                            displayedComponents: .hourAndMinute
+                                        )
+                                        .datePickerStyle(.wheel)
+                                        .labelsHidden()
+                                        .frame(maxWidth: .infinity)
+                                        .colorScheme(.dark)
+                                        .onChange(of: viewModel.actualBedtime) { _ in
+                                            viewModel.actualBedtimeSet = true
+                                        }
                                     }
-                                    
-                                    Button("Save Times") {
+
+                                    // Save button — full width
+                                    Button {
                                         Task { await viewModel.syncToNotion() }
+                                    } label: {
+                                        HStack(spacing: 8) {
+                                            Image(systemName: "icloud.and.arrow.up.fill")
+                                            Text("Save to Notion")
+                                                .font(.headline)
+                                        }
+                                        .foregroundColor(.white)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 14)
+                                        .background(Color.purple.opacity(0.75), in: RoundedRectangle(cornerRadius: 12))
+                                        .contentShape(Rectangle())
                                     }
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 10)
-                                    .background(Color.purple.opacity(0.7))
-                                    .foregroundColor(.white)
-                                    .cornerRadius(12)
+                                    .buttonStyle(.plain)
+                                    .padding(16)
                                 }
+                                .transition(.opacity.combined(with: .move(edge: .top)))
                             }
                         }
-                        .padding()
-                        .liquidGlass(cornerRadius: 20)
+                        .background(.ultraThinMaterial.opacity(0.6), in: RoundedRectangle(cornerRadius: 20))
+                        .clipShape(RoundedRectangle(cornerRadius: 20))
                         .padding(.horizontal)
                         
                         if !viewModel.syncMessage.isEmpty {
