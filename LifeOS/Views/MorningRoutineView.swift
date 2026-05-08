@@ -14,14 +14,9 @@ struct RoutineItem: Identifiable {
 class MorningRoutineViewModel: ObservableObject {
 
     // MARK: - Local Persistence
-    private var todayKey: String {
-        let f = ISO8601DateFormatter(); f.formatOptions = [.withFullDate]
-        return f.string(from: Date())
-    }
-
     func saveLocally() {
         let ud = UserDefaults.standard
-        let today = todayKey
+        let today = DayKey.current
         ud.set(today, forKey: "lifeos.morning.date")
         // Save each item's completion state by its notionKey
         for item in items {
@@ -32,7 +27,7 @@ class MorningRoutineViewModel: ObservableObject {
 
     func loadLocally() {
         let ud = UserDefaults.standard
-        let today = todayKey
+        let today = DayKey.current
         let stored = ud.string(forKey: "lifeos.morning.date") ?? ""
         if stored == today {
             for i in 0..<items.count {

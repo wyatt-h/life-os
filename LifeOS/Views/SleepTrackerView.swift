@@ -31,14 +31,9 @@ class SleepTrackerViewModel: ObservableObject {
     }
 
     // MARK: - Local Persistence
-    private var todayKey: String {
-        let f = ISO8601DateFormatter(); f.formatOptions = [.withFullDate]
-        return f.string(from: Date())
-    }
-
     func saveLocally() {
         let ud = UserDefaults.standard
-        let today = todayKey
+        let today = DayKey.current
         ud.set(today,          forKey: "lifeos.sleep.date")
         ud.set(wokeUpOnTime,   forKey: "lifeos.sleep.wokeUpOnTime")
         ud.set(morningLight,   forKey: "lifeos.sleep.morningLight")
@@ -56,7 +51,7 @@ class SleepTrackerViewModel: ObservableObject {
 
     func loadLocally() {
         let ud = UserDefaults.standard
-        let today = todayKey
+        let today = DayKey.current
         let stored = ud.string(forKey: "lifeos.sleep.date") ?? ""
         if stored == today {
             wokeUpOnTime = ud.bool(forKey: "lifeos.sleep.wokeUpOnTime")

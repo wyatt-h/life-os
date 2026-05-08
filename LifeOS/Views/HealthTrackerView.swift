@@ -43,14 +43,9 @@ class HealthTrackerViewModel: ObservableObject {
 
     // MARK: - Local Persistence (UserDefaults)
 
-    private var todayKey: String {
-        let f = ISO8601DateFormatter(); f.formatOptions = [.withFullDate]
-        return f.string(from: Date())
-    }
-
     func saveLocally() {
         let ud = UserDefaults.standard
-        let today = todayKey
+        let today = DayKey.current
 
         // Reset if it's a new day
         if ud.string(forKey: UDKey.invisalignDate) != today {
@@ -75,7 +70,7 @@ class HealthTrackerViewModel: ObservableObject {
 
     func loadLocally() {
         let ud = UserDefaults.standard
-        let today = todayKey
+        let today = DayKey.current
 
         // If stored data is from a previous day, start fresh
         let storedDate = ud.string(forKey: UDKey.invisalignDate) ?? ""
