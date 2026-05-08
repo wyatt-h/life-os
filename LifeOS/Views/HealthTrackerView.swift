@@ -1,6 +1,19 @@
 import SwiftUI
 import UserNotifications
 
+// MARK: - UserDefaults Keys
+private enum UDKey {
+    // Health
+    static let invisalignOn          = "lifeos.invisalign.isOn"
+    static let invisalignHours       = "lifeos.invisalign.hoursWorn"
+    static let invisalignSessionStart = "lifeos.invisalign.sessionStart"
+    static let invisalignOffStart    = "lifeos.invisalign.offStart"
+    static let invisalignDate        = "lifeos.invisalign.date"   // ISO date string — reset daily
+    static let accutaneTaken         = "lifeos.accutane.taken"
+    static let accutaneTime          = "lifeos.accutane.time"
+    static let accutaneDate          = "lifeos.accutane.date"
+}
+
 // MARK: - ViewModel
 
 @MainActor
@@ -27,6 +40,68 @@ class HealthTrackerViewModel: ObservableObject {
     @Published var syncMessage: String = ""
     @Published var todayPageId: String? = nil
     @Published var notionConnected: Bool = true
+
+    // MARK: - Local Persistence (UserDefaults)
+
+    private var todayKey: String {
+        let f = ISO8601DateFormatter(); f.formatOptions = [.withFullDate]
+        return f.string(from: Date())
+    }
+
+    func saveLocally() {
+        let ud = UserDefaults.standard
+        let today = todayKey
+
+        // Reset if it's a new day
+        if ud.string(forKey: UDKey.invisalignDate) != today {
+            ud.set(today, forKey: UDKey.invisalignDate)
+            ud.set(22.0, forKey: UDKey.invisalignHours)   // start fresh — assume full day
+            ud.removeObject(forKey: UDKey.invisalignSessionStart)
+            ud.removeObject(forKey: UDKey.invisalignOffStart)
+        }
+        if ud.string(forKey: UDKey.accutaneDate) != today {
+            ud.set(today, forKey: UDKey.accutaneDate)
+            ud.set(false, forKey: UDKey.accutaneTaken)
+            ud.set("", forKey: UDKey.accutaneTime)
+        }
+
+        ud.set(isInvisalignOn, forKey: UDKey.invisalignOn)
+        ud.set(hoursWornToday, forKey: UDKey.invisalignHours)
+        ud.set(currentSessionStart, forKey: UDKey.invisalignSessionStart)
+        ud.set(currentOffStart, forKey: UDKey.invisalignOffStart)
+        ud.set(accutaneTaken, forKey: UDKey.accutaneTaken)
+        ud.set(accutaneTime, forKey: UDKey.accutaneTime)
+    }
+
+    func loadLocally() {
+        let ud = UserDefaults.standard
+        let today = todayKey
+
+        // If stored data is from a previous day, start fresh
+        let storedDate = ud.string(forKey: UDKey.invisalignDate) ?? ""
+        if storedDate == today {
+            isInvisalignOn      = ud.bool(forKey: UDKey.invisalignOn)
+            hoursWornToday      = ud.double(forKey: UDKey.invisalignHours)
+            currentSessionStart = ud.object(forKey: UDKey.invisalignSessionStart) as? Date
+            currentOffStart     = ud.object(forKey: UDKey.invisalignOffStart) as? Date
+        } else {
+            // New day — reset
+            isInvisalignOn = true
+            hoursWornToday = 0.0
+            currentSessionStart = Date()   // assume it's been on since app open
+            currentOffStart = nil
+            saveLocally()
+        }
+
+        let storedAccutaneDate = ud.string(forKey: UDKey.accutaneDate) ?? ""
+        if storedAccutaneDate == today {
+            accutaneTaken = ud.bool(forKey: UDKey.accutaneTaken)
+            accutaneTime  = ud.string(forKey: UDKey.accutaneTime) ?? ""
+        } else {
+            accutaneTaken = false
+            accutaneTime  = ""
+        }
+    }
 
     // MARK: Computed
 
@@ -127,6 +202,7 @@ class HealthTrackerViewModel: ObservableObject {
             cancelOffNotification()
         }
 
+        saveLocally()
         Task { await syncToNotion() }
     }
 
@@ -157,6 +233,7 @@ class HealthTrackerViewModel: ObservableObject {
         let formatter = DateFormatter()
         formatter.timeStyle = .short
         accutaneTime = formatter.string(from: Date())
+        saveLocally()
         Task { await syncToNotion() }
     }
 
@@ -304,9 +381,10 @@ struct HealthTrackerView: View {
                 }
             }
             .task {
-                viewModel.requestNotificationPermission()
-                await viewModel.loadFromNotion()
+                viewModel.loadLocally()          // instant local restore
                 viewModel.startLiveTimer()
+                viewModel.requestNotificationPermission()
+                await viewModel.loadFromNotion()  // then sync with Notion in background
             }
             .onDisappear {
                 viewModel.stopLiveTimer()

@@ -30,6 +30,56 @@ class SleepTrackerViewModel: ObservableObject {
         return f.string(from: date)
     }
 
+    // MARK: - Local Persistence
+    private var todayKey: String {
+        let f = ISO8601DateFormatter(); f.formatOptions = [.withFullDate]
+        return f.string(from: Date())
+    }
+
+    func saveLocally() {
+        let ud = UserDefaults.standard
+        let today = todayKey
+        ud.set(today,          forKey: "lifeos.sleep.date")
+        ud.set(wokeUpOnTime,   forKey: "lifeos.sleep.wokeUpOnTime")
+        ud.set(morningLight,   forKey: "lifeos.sleep.morningLight")
+        ud.set(noCaffeine,     forKey: "lifeos.sleep.noCaffeine")
+        ud.set(windDown,       forKey: "lifeos.sleep.windDown")
+        ud.set(inBedOnTime,    forKey: "lifeos.sleep.inBedOnTime")
+        ud.set(noScreens,      forKey: "lifeos.sleep.noScreens")
+        if actualWakeTimeSet {
+            ud.set(actualWakeTime, forKey: "lifeos.sleep.actualWakeTime")
+        }
+        if actualBedtimeSet {
+            ud.set(actualBedtime,  forKey: "lifeos.sleep.actualBedtime")
+        }
+    }
+
+    func loadLocally() {
+        let ud = UserDefaults.standard
+        let today = todayKey
+        let stored = ud.string(forKey: "lifeos.sleep.date") ?? ""
+        if stored == today {
+            wokeUpOnTime = ud.bool(forKey: "lifeos.sleep.wokeUpOnTime")
+            morningLight = ud.bool(forKey: "lifeos.sleep.morningLight")
+            noCaffeine   = ud.bool(forKey: "lifeos.sleep.noCaffeine")
+            windDown     = ud.bool(forKey: "lifeos.sleep.windDown")
+            inBedOnTime  = ud.bool(forKey: "lifeos.sleep.inBedOnTime")
+            noScreens    = ud.bool(forKey: "lifeos.sleep.noScreens")
+            if let d = ud.object(forKey: "lifeos.sleep.actualWakeTime") as? Date {
+                actualWakeTime = d; actualWakeTimeSet = true
+            }
+            if let d = ud.object(forKey: "lifeos.sleep.actualBedtime") as? Date {
+                actualBedtime = d; actualBedtimeSet = true
+            }
+        } else {
+            // New day — reset
+            wokeUpOnTime = false; morningLight = false; noCaffeine = false
+            windDown = false; inBedOnTime = false; noScreens = false
+            actualWakeTimeSet = false; actualBedtimeSet = false
+            saveLocally()
+        }
+    }
+
     // 30-Day Plan schedule
     private let schedule: [(days: ClosedRange<Int>, wake: String, bed: String, phase: String)] = [
         (1...3,   "8:15 AM", "1:15 AM", "Phase 1: Easing In"),
@@ -298,22 +348,22 @@ struct SleepTrackerView: View {
                         // MARK: Habit Toggles
                         VStack(spacing: 10) {
                             SleepHabitRow(title: "Woke up on time", subtitle: "Target: \(viewModel.targetWakeTime)", icon: "alarm.fill", isOn: $viewModel.wokeUpOnTime) {
-                                Task { await viewModel.syncToNotion() }
+                                viewModel.saveLocally(); Task { await viewModel.syncToNotion() }
                             }
                             SleepHabitRow(title: "Morning light", subtitle: "Within 30 min of waking", icon: "sun.horizon.fill", isOn: $viewModel.morningLight) {
-                                Task { await viewModel.syncToNotion() }
+                                viewModel.saveLocally(); Task { await viewModel.syncToNotion() }
                             }
                             SleepHabitRow(title: "No caffeine after 2 PM", subtitle: "Protects melatonin onset", icon: "cup.and.saucer.fill", isOn: $viewModel.noCaffeine) {
-                                Task { await viewModel.syncToNotion() }
+                                viewModel.saveLocally(); Task { await viewModel.syncToNotion() }
                             }
                             SleepHabitRow(title: "Wind-down routine", subtitle: "1 hour before bed", icon: "wind", isOn: $viewModel.windDown) {
-                                Task { await viewModel.syncToNotion() }
+                                viewModel.saveLocally(); Task { await viewModel.syncToNotion() }
                             }
                             SleepHabitRow(title: "In bed on time", subtitle: "Target: \(viewModel.targetBedtime)", icon: "bed.double.fill", isOn: $viewModel.inBedOnTime) {
-                                Task { await viewModel.syncToNotion() }
+                                viewModel.saveLocally(); Task { await viewModel.syncToNotion() }
                             }
                             SleepHabitRow(title: "No screens before bed", subtitle: "30 min before target bedtime", icon: "iphone.slash", isOn: $viewModel.noScreens) {
-                                Task { await viewModel.syncToNotion() }
+                                viewModel.saveLocally(); Task { await viewModel.syncToNotion() }
                             }
                         }
                         .padding(.horizontal)
@@ -461,7 +511,8 @@ struct SleepTrackerView: View {
                 }
             }
             .task {
-                await viewModel.loadFromNotion()
+                viewModel.loadLocally()           // instant local restore
+                await viewModel.loadFromNotion()  // then sync with Notion
             }
         }
     }

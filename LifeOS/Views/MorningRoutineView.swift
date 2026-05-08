@@ -12,6 +12,43 @@ struct RoutineItem: Identifiable {
 // MARK: - ViewModel
 @MainActor
 class MorningRoutineViewModel: ObservableObject {
+
+    // MARK: - Local Persistence
+    private var todayKey: String {
+        let f = ISO8601DateFormatter(); f.formatOptions = [.withFullDate]
+        return f.string(from: Date())
+    }
+
+    func saveLocally() {
+        let ud = UserDefaults.standard
+        let today = todayKey
+        ud.set(today, forKey: "lifeos.morning.date")
+        // Save each item's completion state by its notionKey
+        for item in items {
+            ud.set(item.isCompleted, forKey: "lifeos.morning.\(item.notionKey)")
+        }
+        ud.set(reflectionText, forKey: "lifeos.morning.reflection")
+    }
+
+    func loadLocally() {
+        let ud = UserDefaults.standard
+        let today = todayKey
+        let stored = ud.string(forKey: "lifeos.morning.date") ?? ""
+        if stored == today {
+            for i in 0..<items.count {
+                let key = "lifeos.morning.\(items[i].notionKey)"
+                if ud.object(forKey: key) != nil {
+                    items[i].isCompleted = ud.bool(forKey: key)
+                }
+            }
+            reflectionText = ud.string(forKey: "lifeos.morning.reflection") ?? ""
+        } else {
+            // New day — reset all items
+            for i in 0..<items.count { items[i].isCompleted = false }
+            reflectionText = ""
+            saveLocally()
+        }
+    }
     @Published var items: [RoutineItem] = [
         RoutineItem(title: "Get out of bed",           emoji: "🛏️", notionKey: "Get Out of Bed"),
         RoutineItem(title: "Make my bed",              emoji: "🪴", notionKey: "Make Bed"),
@@ -42,6 +79,7 @@ class MorningRoutineViewModel: ObservableObject {
     func toggleItem(id: UUID) {
         guard let index = items.firstIndex(where: { $0.id == id }) else { return }
         items[index].isCompleted.toggle()
+        saveLocally()
         Task { await syncToNotion() }
     }
     
@@ -305,7 +343,8 @@ struct MorningRoutineView: View {
                 }
             }
             .task {
-                await viewModel.loadFromNotion()
+                viewModel.loadLocally()           // instant local restore
+                await viewModel.loadFromNotion()  // then sync with Notion
             }
         }
     }
