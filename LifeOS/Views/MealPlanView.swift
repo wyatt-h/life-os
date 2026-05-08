@@ -25,10 +25,7 @@ struct MealData {
             name: "Morning Pre-Workout Shake",
             timing: "6:00–6:30 AM · Pre-Workout",
             imageName: "morning_shake",
-            calories: 350,
-            protein: 45,
-            carbs: 35,
-            fat: 5,
+            calories: 350, protein: 45, carbs: 35, fat: 5,
             ingredients: [
                 "2 scoops Nutrilite Plant Protein",
                 "1 ripe banana",
@@ -50,10 +47,7 @@ struct MealData {
             name: "Intra-Workout XS Muscle Multiplier",
             timing: "During Workout",
             imageName: "intra_workout_shake",
-            calories: 50,
-            protein: 4,
-            carbs: 8,
-            fat: 0,
+            calories: 50, protein: 4, carbs: 8, fat: 0,
             ingredients: [
                 "1 serving XS Muscle Multiplier (Berry Blast or Watermelon)",
                 "16 oz cold water"
@@ -71,10 +65,7 @@ struct MealData {
             name: "Evening Protein Shake",
             timing: "Evening · Optional",
             imageName: "evening_shake",
-            calories: 250,
-            protein: 25,
-            carbs: 20,
-            fat: 8,
+            calories: 250, protein: 25, carbs: 20, fat: 8,
             ingredients: [
                 "1 scoop Nutrilite Plant Protein",
                 "1 tbsp TJ's Creamy Salted Peanut Butter",
@@ -97,10 +88,7 @@ struct MealData {
             name: "Quick Oats & Egg Scramble",
             timing: "Breakfast · 15 mins",
             imageName: "week_a_breakfast",
-            calories: 650,
-            protein: 45,
-            carbs: 65,
-            fat: 22,
+            calories: 650, protein: 45, carbs: 65, fat: 22,
             ingredients: [
                 "3 whole eggs",
                 "1 cup liquid egg whites",
@@ -124,10 +112,7 @@ struct MealData {
             name: "Air-Fried Teriyaki Chicken & Sweet Potato",
             timing: "Lunch · Prepped Sunday",
             imageName: "week_a_lunch",
-            calories: 700,
-            protein: 55,
-            carbs: 95,
-            fat: 10,
+            calories: 700, protein: 55, carbs: 95, fat: 10,
             ingredients: [
                 "6 oz chicken breast (cubed)",
                 "3 tbsp TJ's Soyaki sauce",
@@ -153,10 +138,7 @@ struct MealData {
             name: "15-Minute Salmon & Rice Bowl",
             timing: "Dinner · 15 mins",
             imageName: "week_a_dinner",
-            calories: 850,
-            protein: 45,
-            carbs: 100,
-            fat: 30,
+            calories: 850, protein: 45, carbs: 100, fat: 30,
             ingredients: [
                 "6 oz salmon fillet (TJ's Wild Alaskan Sockeye)",
                 "2 cups Jasmine rice (microwave pouch)",
@@ -182,10 +164,7 @@ struct MealData {
             name: "Avocado Toast & Protein",
             timing: "Breakfast · 15 mins",
             imageName: "week_b_breakfast",
-            calories: 700,
-            protein: 35,
-            carbs: 60,
-            fat: 35,
+            calories: 700, protein: 35, carbs: 60, fat: 35,
             ingredients: [
                 "3 slices TJ's Whole Wheat Sandwich Bread",
                 "1/2 ripe avocado",
@@ -209,10 +188,7 @@ struct MealData {
             name: "Ground Turkey & Pasta Skillet",
             timing: "Lunch · Prepped Sunday",
             imageName: "week_b_lunch",
-            calories: 750,
-            protein: 50,
-            carbs: 90,
-            fat: 18,
+            calories: 750, protein: 50, carbs: 90, fat: 18,
             ingredients: [
                 "6 oz Jennie-O 93% lean ground turkey",
                 "2 cups TJ's Organic Whole Wheat Penne",
@@ -241,10 +217,7 @@ struct MealData {
             name: "Quick Beef & Rice Stir-Fry",
             timing: "Dinner · 15 mins",
             imageName: "week_b_dinner",
-            calories: 800,
-            protein: 45,
-            carbs: 95,
-            fat: 25,
+            calories: 800, protein: 45, carbs: 95, fat: 25,
             ingredients: [
                 "6 oz Sprouts 90/10 ground beef",
                 "2 cups Jasmine rice (microwave pouch)",
@@ -309,9 +282,10 @@ struct MealCard: View {
                 } else {
                     Rectangle()
                         .fill(LinearGradient(
-                            colors: meal.isShake ? [.blue.opacity(0.4), .purple.opacity(0.4)] : [.orange.opacity(0.3), .green.opacity(0.3)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
+                            colors: meal.isShake
+                                ? [.blue.opacity(0.4), .purple.opacity(0.4)]
+                                : [.orange.opacity(0.3), .green.opacity(0.3)],
+                            startPoint: .topLeading, endPoint: .bottomTrailing
                         ))
                         .frame(height: 180)
                         .overlay {
@@ -321,11 +295,9 @@ struct MealCard: View {
                         }
                 }
 
-                // Gradient overlay + labels
                 LinearGradient(
                     colors: [.clear, .black.opacity(0.72)],
-                    startPoint: .center,
-                    endPoint: .bottom
+                    startPoint: .center, endPoint: .bottom
                 )
 
                 VStack(alignment: .leading, spacing: 4) {
@@ -333,8 +305,7 @@ struct MealCard: View {
                         Label("Shake", systemImage: "drop.fill")
                             .font(.caption2.bold())
                             .foregroundColor(.white)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
+                            .padding(.horizontal, 8).padding(.vertical, 3)
                             .background(.blue.opacity(0.85), in: Capsule())
                     }
                     Text(meal.name)
@@ -352,15 +323,15 @@ struct MealCard: View {
 
             // Macros Row
             HStack(spacing: 6) {
-                MacroBadge(label: "kcal", value: "\(meal.calories)", color: .orange)
-                MacroBadge(label: "protein", value: "\(meal.protein)g", color: .blue)
-                MacroBadge(label: "carbs", value: "\(meal.carbs)g", color: .green)
-                MacroBadge(label: "fat", value: "\(meal.fat)g", color: .yellow)
+                MacroBadge(label: "kcal",    value: "\(meal.calories)",  color: .orange)
+                MacroBadge(label: "protein", value: "\(meal.protein)g",  color: .blue)
+                MacroBadge(label: "carbs",   value: "\(meal.carbs)g",    color: .green)
+                MacroBadge(label: "fat",     value: "\(meal.fat)g",      color: .yellow)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
 
-            // Expand / Collapse Button
+            // ── Full-width expand button ──────────────────────────────────
             Button {
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                     isExpanded.toggle()
@@ -374,21 +345,22 @@ struct MealCard: View {
                         .font(.subheadline.bold())
                 }
                 .foregroundColor(.primary)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)          // tall enough to tap easily
+                .frame(maxWidth: .infinity)      // full width
                 .background(.ultraThinMaterial)
+                .contentShape(Rectangle())       // entire area is tappable
             }
+            .buttonStyle(.plain)
 
             if isExpanded {
                 VStack(alignment: .leading, spacing: 16) {
 
-                    // Prep Note
                     if let note = meal.prepNote {
                         HStack(alignment: .top, spacing: 8) {
                             Image(systemName: "lightbulb.fill")
                                 .foregroundColor(.yellow)
-                                .font(.caption)
-                                .padding(.top, 2)
+                                .font(.caption).padding(.top, 2)
                             Text(note)
                                 .font(.caption)
                                 .foregroundColor(.secondary)
@@ -397,25 +369,20 @@ struct MealCard: View {
                         .background(.yellow.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
                     }
 
-                    // Ingredients
                     VStack(alignment: .leading, spacing: 8) {
                         Label("Ingredients", systemImage: "cart.fill")
                             .font(.subheadline.bold())
                         ForEach(meal.ingredients, id: \.self) { ingredient in
                             HStack(alignment: .top, spacing: 10) {
-                                Circle()
-                                    .fill(.blue.opacity(0.8))
-                                    .frame(width: 6, height: 6)
-                                    .padding(.top, 6)
-                                Text(ingredient)
-                                    .font(.subheadline)
+                                Circle().fill(.blue.opacity(0.8))
+                                    .frame(width: 6, height: 6).padding(.top, 6)
+                                Text(ingredient).font(.subheadline)
                             }
                         }
                     }
 
                     Divider()
 
-                    // Steps
                     VStack(alignment: .leading, spacing: 10) {
                         Label("Instructions", systemImage: "list.number")
                             .font(.subheadline.bold())
@@ -427,11 +394,10 @@ struct MealCard: View {
                                     .frame(width: 22, height: 22)
                                     .background(
                                         step.hasPrefix("SUNDAY") || step.hasPrefix("AT OFFICE")
-                                        ? Color.orange : Color.blue,
+                                            ? Color.orange : Color.blue,
                                         in: Circle()
                                     )
-                                Text(step)
-                                    .font(.subheadline)
+                                Text(step).font(.subheadline)
                                     .fixedSize(horizontal: false, vertical: true)
                             }
                         }
@@ -447,167 +413,203 @@ struct MealCard: View {
     }
 }
 
-// MARK: - Section Header
-
-struct MealSectionHeader: View {
-    let title: String
-    let icon: String
-    let color: Color
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: icon)
-                .foregroundColor(color)
-                .font(.headline)
-            Text(title)
-                .font(.headline.bold())
-        }
-        .padding(.top, 6)
-    }
-}
-
 // MARK: - Daily Macro Summary
 
 struct DailyMacroSummary: View {
     let week: String
 
     var calories: Int { week == "A" ? 3500 : 3550 }
-    var protein: Int { week == "A" ? 219 : 204 }
+    var protein:  Int { week == "A" ? 219  : 204  }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Daily Macro Target")
-                .font(.subheadline.bold())
-                .foregroundColor(.secondary)
-
-            HStack(spacing: 0) {
-                macroColumn(value: "\(calories)", label: "kcal", color: .orange)
-                Divider().frame(height: 36)
-                macroColumn(value: "\(protein)g", label: "protein", color: .blue)
-                Divider().frame(height: 36)
-                macroColumn(value: "375g", label: "carbs", color: .green)
-                Divider().frame(height: 36)
-                macroColumn(value: "90g", label: "fats", color: .yellow)
-            }
+        HStack(spacing: 0) {
+            macroCol(value: "\(calories)", label: "kcal",    color: .orange)
+            Divider().frame(height: 36)
+            macroCol(value: "\(protein)g", label: "protein", color: .blue)
+            Divider().frame(height: 36)
+            macroCol(value: "375g",        label: "carbs",   color: .green)
+            Divider().frame(height: 36)
+            macroCol(value: "90g",         label: "fats",    color: .yellow)
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
     }
 
-    func macroColumn(value: String, label: String, color: Color) -> some View {
+    func macroCol(value: String, label: String, color: Color) -> some View {
         VStack(spacing: 2) {
             Text(value)
                 .font(.system(size: 17, weight: .bold, design: .rounded))
                 .foregroundColor(color)
-            Text(label)
-                .font(.caption)
-                .foregroundColor(.secondary)
+            Text(label).font(.caption).foregroundColor(.secondary)
         }
         .frame(maxWidth: .infinity)
     }
 }
 
-// MARK: - Main View
+// MARK: - Shakes Tab
 
-struct MealPlanView: View {
-    @State private var selectedWeek: String = "B" // This week is Week B
+struct ShakesTabView: View {
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 16) {
+                // Timing guide
+                VStack(alignment: .leading, spacing: 8) {
+                    Label("Daily Shake Schedule", systemImage: "clock.fill")
+                        .font(.subheadline.bold())
+                    VStack(spacing: 0) {
+                        shakeRow(time: "6:00–6:30 AM", name: "Morning Pre-Workout", color: .blue)
+                        Divider().padding(.leading, 16)
+                        shakeRow(time: "During workout", name: "XS Muscle Multiplier", color: .green)
+                        Divider().padding(.leading, 16)
+                        shakeRow(time: "Evening (optional)", name: "Evening Protein", color: .purple)
+                    }
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+
+                ForEach(MealData.shakes) { shake in
+                    MealCard(meal: shake)
+                        .padding(.horizontal, 16)
+                }
+                Spacer(minLength: 30)
+            }
+        }
+    }
+
+    func shakeRow(time: String, name: String, color: Color) -> some View {
+        HStack(spacing: 12) {
+            Circle().fill(color).frame(width: 8, height: 8)
+            Text(time).font(.caption).foregroundColor(.secondary).frame(width: 130, alignment: .leading)
+            Text(name).font(.caption.bold())
+            Spacer()
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+    }
+}
+
+// MARK: - Meals Tab
+
+struct MealsTabView: View {
+    @Binding var selectedWeek: String
     @State private var showingWeekInfo = false
 
     var currentMeals: [MealItem] {
         selectedWeek == "A" ? MealData.weekAMeals : MealData.weekBMeals
     }
 
-    var weekLabel: String {
-        selectedWeek == "A" ? "Week A · Chicken & Salmon" : "Week B · Turkey & Beef"
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 16) {
+
+                // Week picker — full width
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        Text("Select Week")
+                            .font(.subheadline).foregroundColor(.secondary)
+                        Spacer()
+                        // Full-width info button
+                        Button {
+                            showingWeekInfo.toggle()
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "info.circle")
+                                Text("About plan")
+                                    .font(.caption)
+                            }
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal, 10).padding(.vertical, 6)
+                            .background(.ultraThinMaterial, in: Capsule())
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    Picker("Week", selection: $selectedWeek) {
+                        Text("Week A · Chicken & Salmon").tag("A")
+                        Text("Week B · Turkey & Beef").tag("B")
+                    }
+                    .pickerStyle(.segmented)
+
+                    Label(
+                        selectedWeek == "B" ? "This week" : "Next week · Salmon & Chicken",
+                        systemImage: selectedWeek == "B" ? "calendar.badge.checkmark" : "calendar.badge.clock"
+                    )
+                    .font(.caption.bold())
+                    .foregroundColor(selectedWeek == "B" ? .green : .blue)
+                }
+                .padding(16)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+
+                // Macro summary
+                DailyMacroSummary(week: selectedWeek)
+                    .padding(.horizontal, 16)
+
+                ForEach(currentMeals) { meal in
+                    MealCard(meal: meal)
+                        .padding(.horizontal, 16)
+                }
+
+                // Budget note
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: "cart.badge.questionmark").foregroundColor(.green)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Weekly Grocery Budget").font(.subheadline.bold())
+                        Text(selectedWeek == "A"
+                             ? "~$85–$100/week · Trader Joe's, Sprouts & Ralph's"
+                             : "~$80–$95/week · Trader Joe's, Sprouts & Ralph's")
+                            .font(.caption).foregroundColor(.secondary)
+                    }
+                }
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.green.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
+                .padding(.horizontal, 16)
+
+                Spacer(minLength: 30)
+            }
+        }
+        .sheet(isPresented: $showingWeekInfo) { WeekInfoSheet() }
     }
+}
+
+// MARK: - Main Meal Plan View
+
+struct MealPlanView: View {
+    @State private var selectedTab: Int = 0      // 0 = Shakes, 1 = Meals
+    @State private var selectedWeek: String = "B" // This week is Week B
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
+            VStack(spacing: 0) {
 
-                    // Week Picker
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack {
-                            Text("Select Week")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                            Spacer()
-                            Button {
-                                showingWeekInfo.toggle()
-                            } label: {
-                                Image(systemName: "info.circle")
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-
-                        Picker("Week", selection: $selectedWeek) {
-                            Text("Week A · Chicken & Salmon").tag("A")
-                            Text("Week B · Turkey & Beef").tag("B")
-                        }
-                        .pickerStyle(.segmented)
-
-                        HStack(spacing: 6) {
-                            if selectedWeek == "B" {
-                                Label("This week", systemImage: "calendar.badge.checkmark")
-                                    .font(.caption.bold())
-                                    .foregroundColor(.green)
-                            } else {
-                                Label("Next week (Salmon & Chicken week)", systemImage: "calendar.badge.clock")
-                                    .font(.caption.bold())
-                                    .foregroundColor(.blue)
-                            }
-                        }
-                    }
-                    .padding(16)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
-
-                    // Macro Summary
-                    DailyMacroSummary(week: selectedWeek)
-
-                    // Shakes Section
-                    MealSectionHeader(title: "Daily Shakes", icon: "drop.fill", color: .blue)
-
-                    ForEach(MealData.shakes) { shake in
-                        MealCard(meal: shake)
-                    }
-
-                    // Meals Section
-                    MealSectionHeader(title: weekLabel, icon: "fork.knife", color: .orange)
-
-                    ForEach(currentMeals) { meal in
-                        MealCard(meal: meal)
-                    }
-
-                    // Budget Note
-                    HStack(alignment: .top, spacing: 10) {
-                        Image(systemName: "cart.badge.questionmark")
-                            .foregroundColor(.green)
-                            .font(.headline)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Weekly Grocery Budget")
-                                .font(.subheadline.bold())
-                            Text(selectedWeek == "A"
-                                 ? "~$85–$100/week · Trader Joe's, Sprouts & Ralph's"
-                                 : "~$80–$95/week · Trader Joe's, Sprouts & Ralph's")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    .padding(14)
-                    .background(.green.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
-
-                    Spacer(minLength: 30)
+                // ── Sub-tab picker ────────────────────────────────────────
+                Picker("Section", selection: $selectedTab) {
+                    Label("Shakes", systemImage: "drop.fill").tag(0)
+                    Label("Meals",  systemImage: "fork.knife").tag(1)
                 }
+                .pickerStyle(.segmented)
                 .padding(.horizontal, 16)
-                .padding(.top, 8)
+                .padding(.vertical, 10)
+
+                Divider()
+
+                // ── Content ───────────────────────────────────────────────
+                if selectedTab == 0 {
+                    ShakesTabView()
+                        .transition(.opacity)
+                } else {
+                    MealsTabView(selectedWeek: $selectedWeek)
+                        .transition(.opacity)
+                }
             }
+            .animation(.easeInOut(duration: 0.2), value: selectedTab)
             .navigationTitle("Meal Plan")
             .navigationBarTitleDisplayMode(.large)
-            .sheet(isPresented: $showingWeekInfo) {
-                WeekInfoSheet()
-            }
         }
     }
 }
@@ -623,49 +625,35 @@ struct WeekInfoSheet: View {
                 VStack(alignment: .leading, spacing: 16) {
                     Text("2-Week Rotating Plan")
                         .font(.title2.bold())
-
                     Text("You follow Week A for 7 days, then Week B for 7 days, and repeat. This provides variety without requiring you to rethink your grocery list every week.")
-                        .font(.body)
-                        .foregroundColor(.secondary)
-
+                        .font(.body).foregroundColor(.secondary)
                     Divider()
-
                     VStack(alignment: .leading, spacing: 8) {
-                        Label("System Constraints", systemImage: "gearshape.fill")
-                            .font(.headline)
+                        Label("System Constraints", systemImage: "gearshape.fill").font(.headline)
                         Group {
                             Text("• Budget: ~$100–$115/week ($400–$500/month)")
                             Text("• Time: 15 min breakfast, 15–30 min dinner, 2–2.5 hrs Sunday meal prep")
                             Text("• Dietary: Dairy-free, Invisalign-friendly, no spicy food")
                             Text("• Goal: 3,100–3,200 kcal | 165–195g Protein | 350–400g Carbs | 80–100g Fats")
                         }
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .font(.subheadline).foregroundColor(.secondary)
                     }
-
                     Divider()
-
                     VStack(alignment: .leading, spacing: 8) {
-                        Label("Morning Nutrition Timing", systemImage: "clock.fill")
-                            .font(.headline)
+                        Label("Morning Nutrition Timing", systemImage: "clock.fill").font(.headline)
                         Group {
                             Text("6:00–6:30 AM → Drink morning protein shake (pre-workout)")
                             Text("6:30–7:00 AM → Work out (30 mins)")
                             Text("During workout → Sip XS Muscle Multiplier")
                             Text("7:00–8:00 AM → Eat breakfast (post-workout anabolic window)")
                         }
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .font(.subheadline).foregroundColor(.secondary)
                     }
-
                     Divider()
-
                     VStack(alignment: .leading, spacing: 8) {
-                        Label("When to Adjust", systemImage: "chart.line.uptrend.xyaxis")
-                            .font(.headline)
+                        Label("When to Adjust", systemImage: "chart.line.uptrend.xyaxis").font(.headline)
                         Text("Adjust monthly. On the first Sunday of every month, check your weekly average morning weight. If gaining 0.5–1.0 lbs/week, change nothing. If weight stalls for two weeks, add ~200 calories.")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
+                            .font(.subheadline).foregroundColor(.secondary)
                     }
                 }
                 .padding(20)

@@ -1,101 +1,157 @@
 import SwiftUI
 import UserNotifications
 
-// MARK: - Invisalign Session Model
-struct InvisalignSession: Identifiable {
-    let id = UUID()
-    var offTime: Date?
-    var onTime: Date?
-    
-    var duration: TimeInterval? {
-        guard let off = offTime, let on = onTime else { return nil }
-        return on.timeIntervalSince(off)
-    }
-}
-
 // MARK: - ViewModel
+
 @MainActor
 class HealthTrackerViewModel: ObservableObject {
-    
+
     // MARK: Invisalign State
     @Published var isInvisalignOn: Bool = true
-    @Published var lastToggleTime: Date = Date()
     @Published var hoursWornToday: Double = 0.0
-    @Published var sessions: [InvisalignSession] = []
-    private var currentOffTime: Date? = nil
-    
+    @Published var currentSessionStart: Date? = nil   // when it was last put ON
+    @Published var currentOffStart: Date? = nil       // when it was last taken OFF
+
+    // Live elapsed display
+    @Published var liveElapsedSeconds: Int = 0        // seconds worn so far today (updates every second)
+    private var liveTimer: Timer? = nil
+
     let dailyTarget: Double = 22.0
-    
+
     // MARK: Accutane State
     @Published var accutaneTaken: Bool = false
     @Published var accutaneTime: String = ""
-    
+
     // MARK: Sync State
     @Published var isSyncing: Bool = false
     @Published var syncMessage: String = ""
     @Published var todayPageId: String? = nil
-    
-    // MARK: Notification Timer
-    private var notificationTimer: Timer? = nil
-    
+    @Published var notionConnected: Bool = true
+
     // MARK: Computed
-    var hoursRemaining: Double { max(0, dailyTarget - hoursWornToday) }
+
+    var progressFraction: Double {
+        min(hoursWornToday / dailyTarget, 1.0)
+    }
+
     var isTargetMet: Bool { hoursWornToday >= dailyTarget }
-    
+
     var progressColor: Color {
         if hoursWornToday >= dailyTarget { return .green }
         if hoursWornToday >= dailyTarget * 0.75 { return .yellow }
         return .orange
     }
-    
-    // MARK: Toggle Invisalign
+
+    /// Returns "Xh Ym" string for the live worn counter
+    var liveWornDisplay: String {
+        let totalSeconds = liveElapsedSeconds
+        let h = totalSeconds / 3600
+        let m = (totalSeconds % 3600) / 60
+        let s = totalSeconds % 60
+        if h > 0 {
+            return "\(h)h \(m)m"
+        } else if m > 0 {
+            return "\(m)m \(s)s"
+        } else {
+            return "\(s)s"
+        }
+    }
+
+    /// Returns "Xh Ym" for how long it's currently been OFF (if off)
+    var liveOffDisplay: String? {
+        guard !isInvisalignOn, let offStart = currentOffStart else { return nil }
+        let secs = Int(Date().timeIntervalSince(offStart))
+        let h = secs / 3600
+        let m = (secs % 3600) / 60
+        let s = secs % 60
+        if h > 0 { return "\(h)h \(m)m off" }
+        if m > 0 { return "\(m)m \(s)s off" }
+        return "\(s)s off"
+    }
+
+    var hoursRemainingDisplay: String {
+        let remaining = max(0, dailyTarget - hoursWornToday)
+        let h = Int(remaining)
+        let m = Int((remaining - Double(h)) * 60)
+        return "\(h)h \(m)m left"
+    }
+
+    // MARK: - Timer
+
+    func startLiveTimer() {
+        liveTimer?.invalidate()
+        liveTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.tickTimer()
+            }
+        }
+    }
+
+    func stopLiveTimer() {
+        liveTimer?.invalidate()
+        liveTimer = nil
+    }
+
+    private func tickTimer() {
+        // Base seconds from already-completed worn time
+        var base = Int(hoursWornToday * 3600)
+
+        // If currently ON, add seconds since it was put on
+        if isInvisalignOn, let start = currentSessionStart {
+            base += Int(Date().timeIntervalSince(start))
+        }
+
+        liveElapsedSeconds = base
+    }
+
+    // MARK: - Toggle Invisalign
+
     func toggleInvisalign() {
         let now = Date()
-        
+
         if isInvisalignOn {
-            // Taking out
+            // Taking OUT — record how long it was on in this session
+            if let start = currentSessionStart {
+                let sessionHours = now.timeIntervalSince(start) / 3600
+                hoursWornToday += sessionHours
+            }
             isInvisalignOn = false
-            currentOffTime = now
-            lastToggleTime = now
+            currentSessionStart = nil
+            currentOffStart = now
             scheduleOffNotification()
         } else {
-            // Putting back in
+            // Putting BACK IN
             isInvisalignOn = true
-            if let offTime = currentOffTime {
-                let offDuration = now.timeIntervalSince(offTime) / 3600
-                hoursWornToday = max(0, hoursWornToday - offDuration)
-                // Actually, worn hours = 24 - total off hours
-                // Simplified: add back the time it was off
-            }
-            currentOffTime = nil
-            lastToggleTime = now
+            currentSessionStart = now
+            currentOffStart = nil
             cancelOffNotification()
         }
-        
+
         Task { await syncToNotion() }
     }
-    
-    // MARK: Notifications
+
+    // MARK: - Notifications
+
     func requestNotificationPermission() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
     }
-    
+
     private func scheduleOffNotification() {
         let content = UNMutableNotificationContent()
-        content.title = "Invisalign Reminder"
+        content.title = "Invisalign Reminder 🦷"
         content.body = "Your Invisalign has been off for 1 hour. Time to put it back in!"
         content.sound = .default
-        
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 3600, repeats: false)
         let request = UNNotificationRequest(identifier: "invisalign-off-1h", content: content, trigger: trigger)
         UNUserNotificationCenter.current().add(request)
     }
-    
+
     private func cancelOffNotification() {
         UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["invisalign-off-1h"])
     }
-    
-    // MARK: Accutane
+
+    // MARK: - Accutane
+
     func markAccutaneTaken() {
         accutaneTaken = true
         let formatter = DateFormatter()
@@ -103,321 +159,392 @@ class HealthTrackerViewModel: ObservableObject {
         accutaneTime = formatter.string(from: Date())
         Task { await syncToNotion() }
     }
-    
-    // MARK: Notion Sync
+
+    // MARK: - Notion Sync
+
     func loadFromNotion() async {
-        do {
-            let pageId = try await NotionService.shared.fetchOrCreateTodayEntry(
-                databaseId: NotionService.DatabaseIDs.dailyHealthTracker
-            )
-            todayPageId = pageId
-            
-            if let pageId = pageId {
-                let results = try await NotionService.shared.queryDatabase(
-                    databaseId: NotionService.DatabaseIDs.dailyHealthTracker
-                )
-                if let page = results.first(where: { ($0["id"] as? String) == pageId }),
-                   let props = page["properties"] as? [String: Any] {
-                    
-                    func checkbox(_ key: String) -> Bool {
-                        (props[key] as? [String: Any])?["checkbox"] as? Bool ?? false
-                    }
-                    func text(_ key: String) -> String {
-                        if let prop = props[key] as? [String: Any],
-                           let rt = prop["rich_text"] as? [[String: Any]],
-                           let first = rt.first,
-                           let t = first["text"] as? [String: Any],
-                           let c = t["content"] as? String { return c }
-                        return ""
-                    }
-                    func number(_ key: String) -> Double {
-                        if let prop = props[key] as? [String: Any],
-                           let num = prop["number"] as? Double { return num }
-                        return 0
-                    }
-                    
-                    accutaneTaken = checkbox("Accutane Taken")
-                    isInvisalignOn = checkbox("Invisalign On")
-                    hoursWornToday = number("Hours Worn Today")
-                    
-                    let at = text("Accutane Time")
-                    if !at.isEmpty { accutaneTime = at }
-                }
-            }
-        } catch {
-            syncMessage = "Could not load from Notion"
-        }
-    }
-    
-    func syncToNotion() async {
-        guard let pageId = todayPageId else { return }
         isSyncing = true
-        
+        do {
+            guard let pageId = try await NotionService.shared.fetchOrCreateTodayEntry(
+                databaseId: NotionService.DatabaseIDs.dailyHealthTracker
+            ) else {
+                syncMessage = "Could not get today's page"
+                isSyncing = false
+                return
+            }
+            todayPageId = pageId
+
+            // Re-query to get properties of today's page
+            let results = try await NotionService.shared.queryDatabase(
+                databaseId: NotionService.DatabaseIDs.dailyHealthTracker,
+                filter: ["property": "Date", "date": ["equals": NotionService.shared.todayISO()]]
+            )
+
+            if let page = results.first,
+               let props = page["properties"] as? [String: Any] {
+
+                func checkbox(_ key: String) -> Bool {
+                    (props[key] as? [String: Any])?["checkbox"] as? Bool ?? false
+                }
+                func richText(_ key: String) -> String {
+                    guard let prop = props[key] as? [String: Any],
+                          let rt = prop["rich_text"] as? [[String: Any]],
+                          let first = rt.first,
+                          let t = first["text"] as? [String: Any],
+                          let c = t["content"] as? String else { return "" }
+                    return c
+                }
+                func number(_ key: String) -> Double {
+                    (props[key] as? [String: Any])?["number"] as? Double ?? 0
+                }
+
+                accutaneTaken  = checkbox("Accutane Taken")
+                isInvisalignOn = checkbox("Invisalign On")
+                hoursWornToday = number("Hours Worn Today")
+
+                let at = richText("Accutane Time")
+                if !at.isEmpty { accutaneTime = at }
+
+                // If invisalign is ON, start counting from now
+                if isInvisalignOn { currentSessionStart = Date() }
+            }
+
+            notionConnected = true
+            syncMessage = "Loaded ✓"
+        } catch {
+            notionConnected = false
+            syncMessage = "Notion error: \(error.localizedDescription)"
+            print("[HealthTracker] loadFromNotion error: \(error)")
+        }
+        isSyncing = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { self.syncMessage = "" }
+    }
+
+    func syncToNotion() async {
+        guard let pageId = todayPageId else {
+            syncMessage = "No page ID — try refreshing"
+            return
+        }
+        isSyncing = true
+
         let properties: [String: Any] = [
-            "Invisalign On": ["checkbox": isInvisalignOn],
-            "Hours Worn Today": ["number": hoursWornToday],
+            "Invisalign On":          ["checkbox": isInvisalignOn],
+            "Hours Worn Today":       ["number": hoursWornToday],
             "Daily Target Met (22h)": ["checkbox": isTargetMet],
-            "Accutane Taken": ["checkbox": accutaneTaken],
-            "Accutane Time": ["rich_text": [["text": ["content": accutaneTime]]]]
+            "Accutane Taken":         ["checkbox": accutaneTaken],
+            "Accutane Time":          ["rich_text": [["text": ["content": accutaneTime]]]]
         ]
-        
+
         do {
             try await NotionService.shared.updatePage(pageId: pageId, properties: properties)
+            notionConnected = true
             syncMessage = "Synced ✓"
         } catch {
-            syncMessage = "Sync failed"
+            notionConnected = false
+            syncMessage = "Sync failed — check Notion connection"
+            print("[HealthTracker] syncToNotion error: \(error)")
         }
-        
-        isSyncing = false
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            self.syncMessage = ""
-        }
-    }
-}
 
-// MARK: - Circular Progress View
-struct CircularProgressView: View {
-    let progress: Double
-    let color: Color
-    let label: String
-    let sublabel: String
-    
-    var body: some View {
-        ZStack {
-            Circle()
-                .stroke(Color.white.opacity(0.1), lineWidth: 12)
-            
-            Circle()
-                .trim(from: 0, to: min(progress, 1.0))
-                .stroke(
-                    AngularGradient(
-                        colors: [color.opacity(0.5), color],
-                        center: .center
-                    ),
-                    style: StrokeStyle(lineWidth: 12, lineCap: .round)
-                )
-                .rotationEffect(.degrees(-90))
-                .animation(.easeInOut(duration: 0.5), value: progress)
-            
-            VStack(spacing: 2) {
-                Text(label)
-                    .font(.title2)
-                    .bold()
-                    .foregroundColor(.white)
-                Text(sublabel)
-                    .font(.caption)
-                    .foregroundColor(.white.opacity(0.6))
-            }
-        }
-        .frame(width: 130, height: 130)
+        isSyncing = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { self.syncMessage = "" }
     }
 }
 
 // MARK: - Main View
+
 struct HealthTrackerView: View {
     @StateObject private var viewModel = HealthTrackerViewModel()
-    
+
     var body: some View {
-        NavigationView {
-            ZStack {
-                LinearGradient(
-                    colors: [Color(red: 0.8, green: 0.3, blue: 0.1).opacity(0.4), Color.black],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
-                
-                ScrollView {
-                    VStack(spacing: 24) {
-                        
-                        // MARK: Invisalign Section
-                        VStack(spacing: 16) {
-                            HStack {
-                                Text("Invisalign Tracker")
-                                    .font(.title3)
-                                    .bold()
-                                    .foregroundColor(.white)
-                                Spacer()
-                                if viewModel.isTargetMet {
-                                    Label("Target Met", systemImage: "checkmark.seal.fill")
-                                        .font(.caption)
-                                        .foregroundColor(.green)
-                                }
-                            }
-                            
-                            // Circular Progress
-                            HStack(spacing: 30) {
-                                CircularProgressView(
-                                    progress: viewModel.hoursWornToday / viewModel.dailyTarget,
-                                    color: viewModel.progressColor,
-                                    label: String(format: "%.1f", viewModel.hoursWornToday),
-                                    sublabel: "hrs worn"
-                                )
-                                
-                                VStack(alignment: .leading, spacing: 12) {
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("Daily Target")
-                                            .font(.caption)
-                                            .foregroundColor(.white.opacity(0.6))
-                                        Text("\(Int(viewModel.dailyTarget)) hours")
-                                            .font(.headline)
-                                            .foregroundColor(.white)
-                                    }
-                                    
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("Remaining")
-                                            .font(.caption)
-                                            .foregroundColor(.white.opacity(0.6))
-                                        Text(String(format: "%.1f hrs", viewModel.hoursRemaining))
-                                            .font(.headline)
-                                            .foregroundColor(viewModel.progressColor)
-                                    }
-                                    
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("Status")
-                                            .font(.caption)
-                                            .foregroundColor(.white.opacity(0.6))
-                                        HStack(spacing: 6) {
-                                            Circle()
-                                                .fill(viewModel.isInvisalignOn ? Color.green : Color.red)
-                                                .frame(width: 8, height: 8)
-                                            Text(viewModel.isInvisalignOn ? "Wearing" : "Off")
-                                                .font(.headline)
-                                                .foregroundColor(.white)
-                                        }
-                                    }
-                                }
-                            }
-                            
-                            // Toggle Button
-                            Button(action: {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                    viewModel.toggleInvisalign()
-                                }
-                            }) {
-                                HStack(spacing: 10) {
-                                    Image(systemName: viewModel.isInvisalignOn ? "minus.circle.fill" : "plus.circle.fill")
-                                        .font(.title3)
-                                    Text(viewModel.isInvisalignOn ? "Take Out Invisalign" : "Put In Invisalign")
-                                        .font(.headline)
-                                        .bold()
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 16)
-                                .background(
-                                    viewModel.isInvisalignOn
-                                        ? Color.red.opacity(0.75)
-                                        : Color.green.opacity(0.75)
-                                )
-                                .foregroundColor(.white)
-                                .cornerRadius(18)
-                                .shadow(color: (viewModel.isInvisalignOn ? Color.red : Color.green).opacity(0.4), radius: 10, x: 0, y: 4)
-                            }
-                            
-                            Text("Notification will fire if off for 1+ hour")
-                                .font(.caption)
-                                .foregroundColor(.white.opacity(0.4))
-                        }
-                        .padding()
-                        .liquidGlass(cornerRadius: 24)
-                        .padding(.horizontal)
-                        
-                        // MARK: Accutane Section
-                        VStack(spacing: 16) {
-                            HStack {
-                                Text("Accutane")
-                                    .font(.title3)
-                                    .bold()
-                                    .foregroundColor(.white)
-                                Spacer()
-                            }
-                            
-                            HStack(spacing: 16) {
-                                VStack(alignment: .leading, spacing: 6) {
-                                    Text("Daily Dose")
-                                        .font(.subheadline)
-                                        .foregroundColor(.white.opacity(0.6))
-                                    Text("2 pills at once")
-                                        .font(.headline)
-                                        .foregroundColor(.white)
-                                    
-                                    if viewModel.accutaneTaken && !viewModel.accutaneTime.isEmpty {
-                                        Text("Taken at \(viewModel.accutaneTime)")
-                                            .font(.caption)
-                                            .foregroundColor(.green)
-                                    }
-                                }
-                                
-                                Spacer()
-                                
-                                Button(action: {
-                                    withAnimation(.spring()) {
-                                        if !viewModel.accutaneTaken {
-                                            viewModel.markAccutaneTaken()
-                                        } else {
-                                            viewModel.accutaneTaken = false
-                                            viewModel.accutaneTime = ""
-                                            Task { await viewModel.syncToNotion() }
-                                        }
-                                    }
-                                }) {
-                                    ZStack {
-                                        Circle()
-                                            .fill(viewModel.accutaneTaken ? Color.green.opacity(0.2) : Color.white.opacity(0.1))
-                                            .frame(width: 70, height: 70)
-                                        
-                                        Image(systemName: viewModel.accutaneTaken ? "checkmark.circle.fill" : "pills.fill")
-                                            .font(.system(size: 32))
-                                            .foregroundColor(viewModel.accutaneTaken ? .green : .orange)
-                                    }
-                                }
-                            }
-                            
-                            if !viewModel.accutaneTaken {
-                                Text("Tap the pill icon to mark today's dose as taken")
-                                    .font(.caption)
-                                    .foregroundColor(.white.opacity(0.4))
-                                    .multilineTextAlignment(.center)
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 20) {
+
+                    // Notion status banner
+                    if !viewModel.notionConnected {
+                        NotionSyncBanner()
+                    }
+
+                    // ── Invisalign Card ──────────────────────────────────────
+                    InvisalignCard(viewModel: viewModel)
+
+                    // ── Accutane Card ────────────────────────────────────────
+                    AccutaneCard(viewModel: viewModel)
+
+                    // Sync message
+                    if !viewModel.syncMessage.isEmpty {
+                        HStack(spacing: 6) {
+                            if viewModel.isSyncing {
+                                ProgressView().scaleEffect(0.8)
                             } else {
-                                Text("Done for today! Great job staying consistent.")
-                                    .font(.caption)
-                                    .foregroundColor(.green)
-                                    .multilineTextAlignment(.center)
+                                Image(systemName: viewModel.syncMessage.contains("✓") ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                                    .foregroundColor(viewModel.syncMessage.contains("✓") ? .green : .yellow)
                             }
-                        }
-                        .padding()
-                        .liquidGlass(cornerRadius: 24)
-                        .padding(.horizontal)
-                        
-                        if !viewModel.syncMessage.isEmpty {
                             Text(viewModel.syncMessage)
                                 .font(.caption)
-                                .foregroundColor(.green)
+                                .foregroundColor(.secondary)
                         }
-                        
-                        Spacer(minLength: 40)
+                        .padding(.bottom, 8)
                     }
-                    .padding(.top)
+
+                    Spacer(minLength: 40)
                 }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
             }
             .navigationTitle("Health")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    if viewModel.isSyncing {
-                        ProgressView().tint(.white)
-                    } else {
-                        Button(action: { Task { await viewModel.loadFromNotion() } }) {
-                            Image(systemName: "arrow.clockwise").foregroundColor(.white)
-                        }
+                    Button {
+                        Task { await viewModel.loadFromNotion() }
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
                     }
                 }
             }
             .task {
                 viewModel.requestNotificationPermission()
                 await viewModel.loadFromNotion()
+                viewModel.startLiveTimer()
+            }
+            .onDisappear {
+                viewModel.stopLiveTimer()
             }
         }
+    }
+}
+
+// MARK: - Invisalign Card
+
+struct InvisalignCard: View {
+    @ObservedObject var viewModel: HealthTrackerViewModel
+
+    var body: some View {
+        VStack(spacing: 20) {
+
+            // Header
+            HStack {
+                Label("Invisalign", systemImage: "mouth.fill")
+                    .font(.title3.bold())
+                Spacer()
+                // Live off-timer badge
+                if let offDisplay = viewModel.liveOffDisplay {
+                    Text(offDisplay)
+                        .font(.caption.bold())
+                        .foregroundColor(.red)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(.red.opacity(0.15), in: Capsule())
+                }
+            }
+
+            // Circular progress + live timer
+            ZStack {
+                Circle()
+                    .stroke(Color.secondary.opacity(0.2), lineWidth: 14)
+                    .frame(width: 160, height: 160)
+
+                Circle()
+                    .trim(from: 0, to: viewModel.progressFraction)
+                    .stroke(
+                        AngularGradient(
+                            colors: [viewModel.progressColor.opacity(0.4), viewModel.progressColor],
+                            center: .center
+                        ),
+                        style: StrokeStyle(lineWidth: 14, lineCap: .round)
+                    )
+                    .rotationEffect(.degrees(-90))
+                    .animation(.easeInOut(duration: 0.6), value: viewModel.progressFraction)
+                    .frame(width: 160, height: 160)
+
+                VStack(spacing: 4) {
+                    Text(viewModel.liveWornDisplay)
+                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .foregroundColor(viewModel.progressColor)
+                        .contentTransition(.numericText())
+                        .animation(.default, value: viewModel.liveElapsedSeconds)
+
+                    Text("worn today")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+
+                    Text(viewModel.hoursRemainingDisplay)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+            }
+
+            // Target progress bar
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text("Daily Target: 22h")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text(viewModel.isTargetMet ? "Target Met!" : "\(String(format: "%.1f", viewModel.hoursWornToday))h / 22h")
+                        .font(.caption.bold())
+                        .foregroundColor(viewModel.isTargetMet ? .green : .primary)
+                }
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color.secondary.opacity(0.2))
+                            .frame(height: 8)
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(viewModel.progressColor)
+                            .frame(width: geo.size.width * viewModel.progressFraction, height: 8)
+                            .animation(.easeInOut(duration: 0.6), value: viewModel.progressFraction)
+                    }
+                }
+                .frame(height: 8)
+            }
+
+            // Toggle Button — full width
+            Button {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    viewModel.toggleInvisalign()
+                }
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: viewModel.isInvisalignOn ? "mouth.fill" : "mouth")
+                        .font(.title3)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(viewModel.isInvisalignOn ? "Invisalign is ON" : "Invisalign is OFF")
+                            .font(.headline)
+                        Text(viewModel.isInvisalignOn ? "Tap to take out" : "Tap to put back in")
+                            .font(.caption)
+                            .opacity(0.75)
+                    }
+                    Spacer()
+                    Image(systemName: viewModel.isInvisalignOn ? "checkmark.circle.fill" : "xmark.circle.fill")
+                        .font(.title2)
+                }
+                .foregroundColor(viewModel.isInvisalignOn ? .green : .red)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 16)
+                .frame(maxWidth: .infinity)
+                .background(
+                    (viewModel.isInvisalignOn ? Color.green : Color.red).opacity(0.15),
+                    in: RoundedRectangle(cornerRadius: 14)
+                )
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(20)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
+        .shadow(color: .black.opacity(0.08), radius: 10, x: 0, y: 4)
+    }
+}
+
+// MARK: - Accutane Card
+
+struct AccutaneCard: View {
+    @ObservedObject var viewModel: HealthTrackerViewModel
+
+    var body: some View {
+        VStack(spacing: 16) {
+
+            // Header
+            HStack {
+                Label("Accutane", systemImage: "pills.fill")
+                    .font(.title3.bold())
+                Spacer()
+                if viewModel.accutaneTaken {
+                    Label("Done today", systemImage: "checkmark.circle.fill")
+                        .font(.caption.bold())
+                        .foregroundColor(.green)
+                }
+            }
+
+            // Info row
+            HStack(spacing: 0) {
+                VStack(spacing: 3) {
+                    Text("2 pills")
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .foregroundColor(.orange)
+                    Text("daily dose")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+
+                Divider().frame(height: 36)
+
+                VStack(spacing: 3) {
+                    Text(viewModel.accutaneTaken ? viewModel.accutaneTime : "--:--")
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .foregroundColor(viewModel.accutaneTaken ? .green : .secondary)
+                    Text("taken at")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .padding(.vertical, 8)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+
+            // Full-width button
+            Button {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    if !viewModel.accutaneTaken {
+                        viewModel.markAccutaneTaken()
+                    } else {
+                        viewModel.accutaneTaken = false
+                        viewModel.accutaneTime = ""
+                        Task { await viewModel.syncToNotion() }
+                    }
+                }
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: viewModel.accutaneTaken ? "pills.fill" : "pills")
+                        .font(.title3)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(viewModel.accutaneTaken ? "Taken today" : "Mark as taken")
+                            .font(.headline)
+                        Text(viewModel.accutaneTaken ? "Tap to undo" : "2 pills · once daily")
+                            .font(.caption)
+                            .opacity(0.75)
+                    }
+                    Spacer()
+                    Image(systemName: viewModel.accutaneTaken ? "checkmark.circle.fill" : "circle")
+                        .font(.title2)
+                }
+                .foregroundColor(viewModel.accutaneTaken ? .green : .orange)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 16)
+                .frame(maxWidth: .infinity)
+                .background(
+                    (viewModel.accutaneTaken ? Color.green : Color.orange).opacity(0.15),
+                    in: RoundedRectangle(cornerRadius: 14)
+                )
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(20)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
+        .shadow(color: .black.opacity(0.08), radius: 10, x: 0, y: 4)
+    }
+}
+
+// MARK: - Notion Sync Banner
+
+struct NotionSyncBanner: View {
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundColor(.yellow)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Notion Sync Issue")
+                    .font(.caption.bold())
+                Text("Make sure your integration is connected to this database in Notion → ··· → Connections")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.yellow.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
     }
 }
 
